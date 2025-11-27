@@ -1,139 +1,111 @@
-# 🤖 Self-Correcting RAG System
+# Self-Correcting RAG System
 
-> An advanced Retrieval-Augmented Generation (RAG) pipeline that "thinks" before it speaks. Built with LangGraph, Qdrant, Redis, and Streamlit.
+A robust, agentic Retrieval-Augmented Generation (RAG) system built with **LangGraph**, **Qdrant**, and **Redis**. This project implements a self-correcting workflow that retrieves information from multiple sources (Wikipedia, ArXiv), validates the generated answers, and dynamically fetches missing information if needed.
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![LangChain](https://img.shields.io/badge/LangChain-v0.1-green)
-![Qdrant](https://img.shields.io/badge/Qdrant-VectorDB-red)
-![Redis](https://img.shields.io/badge/Redis-Caching-red)
+## 🚀 Key Features
 
-## 📖 Overview
-
-This project implements a **Self-Correcting RAG** system. Unlike standard RAG pipelines that blindly trust retrieved documents, this system employs a multi-agent architecture to:
-1.  **Retrieve** information from multiple sources (Wikipedia, ArXiv, Web).
-2.  **Generate** an initial answer.
-3.  **Validate** the answer for completeness, accuracy, and relevance.
-4.  **Self-Correct** by performing targeted web searches if the initial answer is poor or outdated.
-5.  **Synthesize** a final, high-quality response.
-
-## ✨ Key Features
-
-- **🧠 Multi-Agent Orchestration**: Powered by **LangGraph** to manage the complex flow of retrieval, generation, and validation.
-- **🔍 Hybrid Retrieval**: Combines **Dense Vector Search** (SentenceTransformers) with **Cross-Encoder Re-ranking** for superior accuracy.
-- **⚡ Two-Tier Caching (Redis)**:
-    - **Tier 1**: Instant responses for identical queries (TTL: 1 hour).
-    - **Tier 2**: Cached vector embeddings to reduce compute costs (TTL: 24 hours).
-- **🛡️ Self-Correction Loop**: Automatically detects "hallucinations" or missing info and fetches new data.
-- **👁️ Full Observability**: Real-time tracking of tokens, latency, and reasoning steps via a custom tracker.
-- **💻 Interactive UI**: A beautiful **Streamlit** interface to visualize the entire "Chain of Thought".
-
-## 🏗️ Architecture
-
-```mermaid
-graph TD
-    User[User Query] --> Cache{Check Cache}
-    Cache -- Hit --> Result[Final Answer]
-    Cache -- Miss --> Retrieve[Retrieve Docs]
-    
-    subgraph "RAG Pipeline (LangGraph)"
-        Retrieve --> Generate[Generate Initial Answer]
-        Generate --> Validate[Validate Answer]
-        Validate -- "Good Score > 0.8" --> Synthesize[Synthesize Final]
-        Validate -- "Poor/Outdated" --> Execute[Execute Web Search]
-        Execute --> Synthesize
-    end
-    
-    Synthesize --> Result
-    Result --> CacheUpdate[Update Cache]
-```
+*   **Agentic Workflow**: Powered by **LangGraph**, the system orchestrates a multi-step process: Retrieval -> Generation -> Validation -> Execution (if needed) -> Synthesis.
+*   **Multi-Source Retrieval**: Simultaneously searches **Wikipedia** and **ArXiv** for comprehensive context.
+*   **Hybrid Search & Re-ranking**: Combines dense vector search (Qdrant) with keyword matching and refines results using a Cross-Encoder for high precision.
+*   **Self-Correction**: A dedicated **Validation Agent** critiques answers. If an answer is incomplete or outdated, the **Execution Agent** performs active web research to fill the gaps.
+*   **Two-Tier Caching**:
+    *   **Tier 1**: Caches final answers in **Redis** (1-hour TTL) for instant responses to repeated queries.
+    *   **Tier 2**: Caches vector embeddings (24-hour TTL) to save computation costs.
+*   **Observability**: Tracks every step of the pipeline for debugging and performance monitoring.
 
 ## 🛠️ Tech Stack
 
-- **LLM Orchestration**: LangChain, LangGraph
-- **Vector Database**: Qdrant (Dockerized)
-- **Caching**: Redis (Dockerized)
-- **Embeddings**: `all-MiniLM-L6-v2`
-- **Re-ranking**: `cross-encoder/ms-marco-MiniLM-L-6-v2`
-- **UI**: Streamlit
-- **LLM Provider**: Ollama (Local) or OpenAI (Optional)
+*   **Core**: Python 3.9+, LangChain, LangGraph
+*   **Vector Database**: Qdrant
+*   **Caching**: Redis
+*   **LLM**: Ollama (Local) / OpenAI (Optional)
+*   **UI**: Streamlit
+*   **Containerization**: Docker & Docker Compose
 
-## 🚀 Getting Started
+## 📋 Prerequisites
 
-### Prerequisites
-- **Docker & Docker Compose** (for Qdrant and Redis)
-- **Python 3.10+**
-- **Ollama** (running locally)
+*   [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed.
+*   [Ollama](https://ollama.com/) installed and running locally (for local LLM support).
+    *   Pull the model: `ollama pull mistral` (or your preferred model).
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/yourusername/self-correcting-rag.git
-cd self-correcting-rag
-```
+## ⚡ Quick Start (Docker)
 
-### 2. Environment Setup
-Create a `.env` file in the root directory:
-```env
-# LLM Configuration
-OLLAMA_BASE_URL=http://localhost:11434
-MODEL_NAME=llama3  # or mistral
+The easiest way to run the system is using Docker Compose.
 
-# Vector DB
-QDRANT_URL=http://localhost:6333
+1.  **Clone the Repository**
+    ```bash
+    git clone <repository-url>
+    cd <repository-name>
+    ```
 
-# Caching
-REDIS_URL=redis://localhost:6379
+2.  **Configure Environment**
+    Create a `.env` file in the root directory:
+    ```env
+    # LLM Configuration
+    OLLAMA_BASE_URL=http://host.docker.internal:11434
+    LLM_MODEL=mistral
 
-# Search API (Optional, for web search)
-SERPER_API_KEY=your_api_key_here
-```
+    # Search API (Optional, for fallback web search)
+    SERPER_API_KEY=your_serper_api_key
+    TAVILY_API_KEY=your_tavily_api_key
+    ```
 
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+3.  **Run with Docker Compose**
+    ```bash
+    docker-compose up --build
+    ```
+    *   The application will be available at `http://localhost:8501`.
+    *   Qdrant dashboard: `http://localhost:6333/dashboard`.
 
-### 4. Start Infrastructure
-Start Qdrant and Redis using Docker Compose:
-```bash
-docker-compose up -d
-```
+## 📦 Local Installation
 
-### 5. Ingest Data (Optional)
-Ingest some sample ArXiv papers into the vector database:
-```bash
-python scripts/ingest_arxiv.py
-```
+If you prefer to run without Docker:
 
-### 6. Run the Application
-```bash
-streamlit run src/ui/app.py
-```
+1.  **Install Dependencies**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-## 🖥️ Usage
+2.  **Start Infrastructure**
+    Ensure you have local instances of **Qdrant** (port 6333) and **Redis** (port 6379) running.
 
-1.  Open your browser at `http://localhost:8501`.
-2.  Type a question (e.g., *"What is the architecture of a Transformer?"*).
-3.  **View the Magic**:
-    - Click the **"Chain of Thought"** tab to see the system "thinking".
-    - Watch it retrieve docs, validate its own answer, and potentially search the web if needed.
-4.  **Test Caching**: Ask the same question again to see the "Instant Cache Hit".
+3.  **Run the Application**
+    ```bash
+    streamlit run src/ui/app.py
+    ```
+
+## 🏗️ Architecture
+
+The system follows a cyclic graph architecture:
+
+1.  **Retrieve**: Fetches documents from Qdrant (Wiki/ArXiv).
+2.  **Generate**: LLM drafts an initial answer.
+3.  **Validate**: Checks the answer for accuracy, completeness, and timeliness.
+    *   *Pass*: Returns the answer.
+    *   *Fail*: Triggers the **Execute** phase.
+4.  **Execute**: Generates search queries to find missing information (Web Search).
+5.  **Synthesize**: Merges the initial draft with new findings to produce the final answer.
 
 ## 📂 Project Structure
 
 ```
+├── data/               # Local data storage
+├── scripts/            # Ingestion scripts (Wiki, ArXiv, SQL)
 ├── src/
-│   ├── agents/         # LangGraph agent logic (Graph, Validation, Execution)
-│   ├── rag/            # Retrieval (Qdrant) and Generation logic
-│   ├── cache/          # Redis caching implementation
+│   ├── agents/         # LangGraph agents (Graph, Validation, Execution, etc.)
+│   ├── cache/          # Redis caching logic
+│   ├── rag/            # Retrieval and Generation logic (Qdrant, Hybrid Search)
 │   ├── ui/             # Streamlit application
-│   └── observability/  # Custom logging and metrics
-├── scripts/            # Data ingestion scripts
-├── docker-compose.yml  # Infrastructure setup
-└── requirements.txt    # Python dependencies
+│   └── utils/          # Helper functions
+├── docker-compose.yml  # Docker services config
+├── requirements.txt    # Python dependencies
+└── README.md           # Project documentation
 ```
 
-## 🤝 Contributors
-- **[Your Name]** - Lead Developer
+## 🤝 Contributing
 
----
-*Built with ❤️ using LangChain and Streamlit*
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License.
